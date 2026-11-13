@@ -1,0 +1,83 @@
+# Builds SCAR.dll on a clean GitHub-hosted Windows machine.
+# Every dependency is pinned to a known revision so the build is traceable.
+name: Build SCAR.dll
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COMMONLIB_SHA: 8ffc2b74af015f837de53cc02b0cb470a15678e4   # CommonLibSSE-NG v12.1.0 (README pin)
+  VCPKG_SHA: ee12231b20c95013c6638d845d04c91559a1d1ff      # vcpkg.json builtin-baseline
+  MINHOOK_TAG: v1.3.4                                      # hde64.h for src/NativeValidation.h
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout SCAR
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned dependencies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # CommonLibSSE-NG at the exact pinned commit
+          git init extern/CommonLibSSE-NG
+          git -C extern/CommonLibSSE-NG remote add origin https://github.com/alandtse/CommonLibSSE-NG.git
+          git -C extern/CommonLibSSE-NG fetch --depth 1 origin $env:COMMONLIB_SHA
+          git -C extern/CommonLibSSE-NG checkout FETCH_HEAD
+          git -C extern/CommonLibSSE-NG submodule update --init --depth 1
+
+          # DKUtil (header-only); record which commit was used
+          git clone --depth 1 https://github.com/gottyduke/DKUtil.git ../DKUtil
+          "DKUtil commit: $(git -C ../DKUtil rev-parse HEAD)"
+
+          # minhook's hde64 headers, at the path CMakeLists.txt expects
+          git clone --depth 1 --branch $env:MINHOOK_TAG https://github.com/TsudaKageyu/minhook.git ../_toolchain/minhook-$env:MINHOOK_TAG
+
+          # vcpkg at the manifest's baseline
+          git clone https://github.com/microsoft/vcpkg.git ../vcpkg
+          git -C ../vcpkg checkout $env:VCPKG_SHA
+          ../vcpkg/bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        run: |
+          $env:VCPKG_ROOT = (Resolve-Path ../vcpkg).Path
+          $env:DKUtilPath = (Resolve-Path ../DKUtil).Path
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
+            -DMOD_AUTOMATED_BUILD=ON `
+            -DBUILD_TESTS=OFF `
+            -DSKSE_SUPPORT_XBYAK=ON `
+            -DSKSEPluginAuthor=Maxsu
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Hash
+        run: |
+          Get-FileHash build/SCAR.dll -Algorithm SHA256 | Format-List
+          (Get-FileHash build/SCAR.dll -Algorithm SHA256).Hash | Out-File build/SCAR.dll.sha256
+
+      - name: Upload SCAR.dll
+        uses: actions/upload-artifact@v4
+        with:
+          name: SCAR-1.0.9-1.7.104
+          path: |
+            build/SCAR.dll
+            build/SCAR.pdb
+            build/SCAR.dll.sha256
+          if-no-files-found: error
