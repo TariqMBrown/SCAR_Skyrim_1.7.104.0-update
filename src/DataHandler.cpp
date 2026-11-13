@@ -13,7 +13,7 @@ namespace SCAR
 			WARN("SCAR.ini unavailable; retaining defaults");
 		} else {
 			for (const auto setting : {&enableDebugLog, &enableDebugOverlay}) {
-				if (const auto raw = ini.GetValue("Debug", setting->get_key())) {
+				if (const auto raw = ini.GetValue("Debug", std::string(setting->get_key()).c_str())) {
 					const auto value = ActionRules::DebugFlag(raw);
 					if (value) **setting = *value;
 					else WARN("Invalid SCAR.ini setting {}; retaining default", setting->get_key());
