@@ -91,7 +91,7 @@ namespace SCAR
 		}
 		static const Patch& Epilog(bool ae) { return ae ? AE_Epilog : SE_Epilog; }
 		static constexpr std::size_t TrampolineBytes = sizeof(Imm64) + AE17104_Prolog.Size +
-			sizeof(DKUtil::Hook::SubRsp<>) + sizeof(DKUtil::Hook::CallRip) +
+			sizeof(DKUtil::Hook::SubRsp) + sizeof(DKUtil::Hook::CallRip) +
 			sizeof(DKUtil::Hook::AddRsp) + AE_Epilog.Size + sizeof(DKUtil::Hook::JmpRel);
 		static bool Install()
 		{

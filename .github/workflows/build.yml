@@ -11,6 +11,7 @@ permissions:
 env:
   COMMONLIB_SHA: 8ffc2b74af015f837de53cc02b0cb470a15678e4   # CommonLibSSE-NG v12.1.0 (README pin)
   VCPKG_SHA: ee12231b20c95013c6638d845d04c91559a1d1ff      # vcpkg.json builtin-baseline
+  DKUTIL_SHA: 814e5282698b301460c6f3318db5d9364cf44a6a   # gottyduke/DKUtil, layout verified against Hook_AttackStart.h
   MINHOOK_TAG: v1.3.4                                      # hde64.h for src/NativeValidation.h
 
 jobs:
@@ -34,9 +35,11 @@ jobs:
           git -C extern/CommonLibSSE-NG checkout FETCH_HEAD
           git -C extern/CommonLibSSE-NG submodule update --init --depth 1
 
-          # DKUtil (header-only); record which commit was used
-          git clone --depth 1 https://github.com/gottyduke/DKUtil.git ../DKUtil
-          "DKUtil commit: $(git -C ../DKUtil rev-parse HEAD)"
+          # DKUtil (header-only) at the pinned commit
+          git init ../DKUtil
+          git -C ../DKUtil remote add origin https://github.com/gottyduke/DKUtil.git
+          git -C ../DKUtil fetch --depth 1 origin $env:DKUTIL_SHA
+          git -C ../DKUtil checkout FETCH_HEAD
 
           # minhook's hde64 headers, at the path CMakeLists.txt expects
           git clone --depth 1 --branch $env:MINHOOK_TAG https://github.com/TsudaKageyu/minhook.git ../_toolchain/minhook-$env:MINHOOK_TAG
